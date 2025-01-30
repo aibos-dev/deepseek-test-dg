@@ -1,0 +1,45 @@
+version: "3.8"
+services:
+  deepseek-test-dg:
+    container_name: deepseek-test-container
+    image: deepseek-test-image
+    runtime: nvidia
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        USERNAME: ${USERNAME:-devuser}
+        USER_UID: ${UID:-1001}
+        USER_GID: ${GID:-1001}
+        PYTHON_VERSION: 3.11.11
+        PYTHON_MAJOR: "3.11"
+    shm_size: "16gb"
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    volumes:
+      - ..:/workspace
+      - poetry-cache:/home/devuser/.cache/pypoetry
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/st1/
+      - /mnt/st2/
+    environment:
+      ENV: "dev"
+      TZ: "Africa/Nairobi"
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+      DEVICE: "gpu"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0','1','2','3','4','5','6','7']
+              capabilities: [gpu]
+    command: bash
+
+volumes:
+  poetry-cache:
