@@ -1,137 +1,115 @@
-#!/bin/bash
+import os
 
-# Set model, dataset, and output directories
-MODEL_NAME="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"  # Change this to the model you want to fine-tune
-DATASET_NAME="AI-MO/NuminaMath-TIR"  # Replace with your dataset
-OUTPUT_DIR="/mnt/st1/results/DeepSeek-Train"
-LOG_DIR="/mnt/st1/logs"
-TASK="aime24"  # Set your custom task
+import torch
+from accelerate import Accelerator
+from datasets import load_dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 
-# Training Parameters
-LEARNING_RATE="2.0e-5"
-NUM_TRAIN_EPOCHS=3
-MAX_SEQ_LENGTH=4096
-BATCH_SIZE=4
-GRAD_ACCUMULATION_STEPS=4
-GRAD_CHECKPOINTING="--gradient_checkpointing"
-BF16="--bf16"
-LOGGING_STEPS=5
-EVAL_STEPS=100
+# Initialize the accelerator
+accelerator = Accelerator()
 
-# Slurm Parameters (for job submission)
-SLURM_OUTPUT="/mnt/st1/logs/%x-%j.out"
-SLURM_ERROR="/mnt/st1/logs/%x-%j.err"
+# Define constants for directories
+DATA_DIR = "/workspace/src/deepseek-test-dg/entity/data"
+MODEL_DIR = "/workspace/src/deepseek-test-dg/entity/model"
+OUTPUT_DIR = "/workspace/src/deepseek-test-dg/entity/outputs"
 
-# Model Fine-tuning using Accelerate with DeepSpeed (ZeRO-3)
-def fine_tune_model() {
-    echo "Starting Fine-Tuning with DeepSpeed (ZeRO-3) for $MODEL_NAME..."
+# Define model and dataset configurations
+MODEL_NAME = "Qwen/Qwen2.5-Math-1.5B-Instruct"
+DATASET_NAME = "HuggingFaceH4/Bespoke-Stratos-17k"
 
-    accelerate launch --config_file=configs/zero3.yaml src/open_r1/sft.py \
-        --model_name_or_path $MODEL_NAME \
-        --dataset_name $DATASET_NAME \
-        --learning_rate $LEARNING_RATE \
-        --num_train_epochs $NUM_TRAIN_EPOCHS \
-        --packing \
-        --max_seq_length $MAX_SEQ_LENGTH \
-        --per_device_train_batch_size $BATCH_SIZE \
-        --per_device_eval_batch_size $BATCH_SIZE \
-        --gradient_accumulation_steps $GRAD_ACCUMULATION_STEPS \
-        $GRAD_CHECKPOINTING \
-        $BF16 \
-        --logging_steps $LOGGING_STEPS \
-        --eval_strategy steps \
-        --eval_steps $EVAL_STEPS \
-        --output_dir $OUTPUT_DIR
+# Define training hyperparameters
+TRAINING_ARGS = {
+    "learning_rate": 2.0e-5,
+    "num_train_epochs": 1,
+    "max_seq_length": 4096,
+    "per_device_train_batch_size": 2,
+    "per_device_eval_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "gradient_checkpointing": True,
+    "bf16": True,
+    "logging_steps": 5,
+    "evaluation_strategy": "steps",
+    "eval_steps": 100,
+    "output_dir": OUTPUT_DIR,
 }
 
-# Submit job using Slurm for SFT (Fine-tuning)
-def submit_sft_slurm() {
-    echo "Submitting Fine-Tuning job to Slurm..."
 
-    sbatch --output=$SLURM_OUTPUT --err=$SLURM_ERROR slurm/sft.slurm \
-        --model $MODEL_NAME --dataset $DATASET_NAME --accelerator zero3
-}
+def load_model_and_tokenizer():
+    """Load the model and tokenizer from pretrained weights."""
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
+    return model, tokenizer
 
-# GRPO Training using Accelerate with DeepSpeed (ZeRO-3)
-def grpo_training() {
-    echo "Starting GRPO Training with DeepSpeed (ZeRO-3) for $MODEL_NAME..."
 
-    accelerate launch --config_file configs/zero3.yaml src/open_r1/grpo.py \
-        --output_dir $OUTPUT_DIR/DeepSeek-R1-Distill-Qwen-7B-GRPO \
-        --model_name_or_path $MODEL_NAME \
-        --dataset_name $DATASET_NAME \
-        --max_prompt_length 256 \
-        --per_device_train_batch_size 1 \
-        --gradient_accumulation_steps 16 \
-        --logging_steps 10 \
-        $BF16
-}
+def load_and_preprocess_dataset(tokenizer):
+    """Load and tokenize the dataset."""
+    dataset = load_dataset(DATASET_NAME, cache_dir=DATA_DIR)
 
-# Model Evaluation with lighteval
-def evaluate_model() {
-    echo "Evaluating Model $MODEL_NAME..."
+    def tokenize_function(examples):
+        joined_messages = [
+            " ".join(message["content"] for message in messages)
+            for messages in examples["messages"]
+        ]
+        tokenized_inputs = tokenizer(
+            joined_messages,
+            padding="max_length",
+            truncation=True,
+            max_length=TRAINING_ARGS["max_seq_length"],
+        )
+        tokenized_inputs["labels"] = tokenized_inputs[
+            "input_ids"
+        ].copy()  # Ensure labels are present
+        return tokenized_inputs
 
-    MODEL_ARGS="pretrained=$MODEL_NAME,dtype=float16,max_model_length=32768,gpu_memory_utilisation=0.8"
-    OUTPUT_DIR=$OUTPUT_DIR/evals/$MODEL_NAME
+    return dataset.map(tokenize_function, batched=True)
 
-    lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
-        --custom-tasks src/open_r1/evaluate.py \
-        --use-chat-template \
-        --system-prompt="Please reason step by step, and put your final answer within \boxed{}." \
-        --output-dir $OUTPUT_DIR
-}
 
-# Multi-GPU Evaluation with Data Parallelism
-def evaluate_model_data_parallel() {
-    NUM_GPUS=8
-    echo "Evaluating Model with Data Parallelism across $NUM_GPUS GPUs..."
+class CustomTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+        labels = inputs.pop("labels")
+        outputs = model(**inputs)
+        logits = outputs.logits
 
-    MODEL_ARGS="pretrained=$MODEL_NAME,dtype=float16,data_parallel_size=$NUM_GPUS,max_model_length=32768,gpu_memory_utilisation=0.8"
-    OUTPUT_DIR=$OUTPUT_DIR/evals/$MODEL_NAME
+        # Compute loss
+        loss_fct = torch.nn.CrossEntropyLoss()
+        loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
 
-    lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
-        --custom-tasks src/open_r1/evaluate.py \
-        --use-chat-template \
-        --system-prompt="Please reason step by step, and put your final answer within \boxed{}." \
-        --output-dir $OUTPUT_DIR
-}
+        return (loss, outputs) if return_outputs else loss
 
-# Multi-GPU Evaluation with Tensor Parallelism
-def evaluate_model_tensor_parallel() {
-    NUM_GPUS=8
-    echo "Evaluating Model with Tensor Parallelism across $NUM_GPUS GPUs..."
 
-    MODEL_ARGS="pretrained=$MODEL_NAME,dtype=float16,tensor_parallel_size=$NUM_GPUS,max_model_length=32768,gpu_memory_utilisation=0.8"
-    OUTPUT_DIR=$OUTPUT_DIR/evals/$MODEL_NAME
+def main():
+    """Main function to run training."""
+    print("Initializing training script...")
 
-    export VLLM_WORKER_MULTIPROC_METHOD=spawn
-    lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
-        --custom-tasks src/open_r1/evaluate.py \
-        --use-chat-template \
-        --system-prompt="Please reason step by step, and put your final answer within \boxed{}." \
-        --output-dir $OUTPUT_DIR
-}
+    model, tokenizer = load_model_and_tokenizer()
+    tokenized_dataset = load_and_preprocess_dataset(tokenizer)
 
-# Main Execution
-def main() {
-    # Run Fine-Tuning (uncomment if you want to run fine-tuning)
-    fine_tune_model
-    
-    # Submit Fine-Tuning job to Slurm (uncomment if you want to submit job)
-    # submit_sft_slurm
-    
-    # Run GRPO Training (uncomment if you want to run GRPO)
-    # grpo_training
+    training_args = TrainingArguments(
+        output_dir=TRAINING_ARGS["output_dir"],
+        learning_rate=TRAINING_ARGS["learning_rate"],
+        num_train_epochs=TRAINING_ARGS["num_train_epochs"],
+        per_device_train_batch_size=TRAINING_ARGS["per_device_train_batch_size"],
+        per_device_eval_batch_size=TRAINING_ARGS["per_device_eval_batch_size"],
+        gradient_accumulation_steps=TRAINING_ARGS["gradient_accumulation_steps"],
+        gradient_checkpointing=TRAINING_ARGS["gradient_checkpointing"],
+        bf16=TRAINING_ARGS["bf16"],
+        logging_steps=TRAINING_ARGS["logging_steps"],
+        evaluation_strategy=TRAINING_ARGS["evaluation_strategy"],
+        eval_steps=TRAINING_ARGS["eval_steps"],
+    )
 
-    # Evaluate Model (Single GPU)
-    evaluate_model
-    
-    # Evaluate Model with Data Parallelism (Multiple GPUs)
-    # evaluate_model_data_parallel
+    trainer = CustomTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_dataset["train"],
+        eval_dataset=tokenized_dataset.get("test", None),  # Handle missing test set
+        tokenizer=tokenizer,
+    )
 
-    # Evaluate Model with Tensor Parallelism (Multiple GPUs)
-    # evaluate_model_tensor_parallel
-}
+    print("Starting training...")
+    trainer.train()
+    print("Training completed.")
 
-# Run the script
-main
+
+if __name__ == "__main__":
+    main()
