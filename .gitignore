@@ -169,3 +169,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Temp folders
+data/
+wandb/
+logs/
+eval_results/
+results/
+=0.7.0

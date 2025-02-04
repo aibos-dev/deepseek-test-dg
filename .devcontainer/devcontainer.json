@@ -1,6 +1,6 @@
 {
     "name": "DeepSeek Test DG",
-    "dockerComposeFile": "./docker-compose.yaml",
+    "dockerComposeFile": "../docker-compose.yaml",
     "service": "deepseek-test-dg",
     "workspaceFolder": "/workspace",
     "shutdownAction": "stopCompose",

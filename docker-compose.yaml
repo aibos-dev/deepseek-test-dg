@@ -5,8 +5,8 @@ services:
     image: deepseek-test-image
     runtime: nvidia
     build:
-      context: ..
-      dockerfile: .devcontainer/Dockerfile
+      context: .
+      dockerfile: Dockerfile
       args:
         USERNAME: ${USERNAME:-devuser}
         USER_UID: ${UID:-1001}
@@ -21,11 +21,10 @@ services:
     stdin_open: true
     tty: true
     volumes:
-      - ..:/workspace
+      - ../deepseek-test-dg:/workspace
       - poetry-cache:/home/devuser/.cache/pypoetry
       - /var/run/docker.sock:/var/run/docker.sock
-      - /mnt/st1/
-      - /mnt/st2/
+      - /mnt/st1/DeepSeekV3-2:/mymodels
     environment:
       ENV: "dev"
       TZ: "Africa/Nairobi"
