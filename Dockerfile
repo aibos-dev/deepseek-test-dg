@@ -13,7 +13,7 @@ ENV TZ=Africa/Nairobi \
     UV_PYTHON_DOWNLOADS=never \
     UV_PYTHON=python$PYTHON_MAJOR \
     UV_PROJECT_ENVIRONMENT="/usr/local/"
-    
+
 WORKDIR /tmp/
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && apt-get update && apt-get install -y --no-install-recommends \
@@ -44,9 +44,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && cd /usr/local/Python-$PYTHON_VERSION \
     && ./configure --enable-optimizations \
     && make install \
+    && ln -fs /usr/local/bin/python3.12 /usr/bin/python3 \
+    && ln -fs /usr/local/bin/python3.12 /usr/bin/python \
     && rm /usr/local/Python-$PYTHON_VERSION.tar.xz \
-    && cd /usr/local/Python-$PYTHON_VERSION \
-    && ln -fs /usr/local/Python-$PYTHON_VERSION/python /usr/bin/python \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf \
@@ -56,11 +56,12 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     /tmp/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN chmod +x /usr/local/bin/uv && \
+    uv --version
 
 # Copy dependency files
 COPY . /workspace
 WORKDIR /workspace
-
 
 # Setup user
 ARG UID=1001
@@ -84,4 +85,4 @@ RUN set -ex && \
     uv pip install vllm>=0.7.0 && \
     uv pip install -e /workspace
 
-CMD ["/bin/bash", "-c", ". /workspace/openr1/bin/activate && /bin/bash"]
+CMD ["/bin/bash", "-c", "source /workspace/openr1/bin/activate && /bin/bash"]
