@@ -1,47 +1,32 @@
-## Installation
+## Quick Start
 
-**Note: Libraries rely on CUDA 12.1. Double check your system if you get segmentation faults.**
-
-To run the code in this project, first, create a Python virtual environment using e.g. `uv`.
-To install `uv`, follow the [UV Installation Guide](https://docs.astral.sh/uv/getting-started/installation/).
-
-```shell
-uv venv openr1 --python 3.11 && source openr1/bin/activate && uv pip install --upgrade pip
+1. Clone the repository:
+```bash
+git clone https://github.com/aibos-dev/deepseek-test-dg.git
+cd deepseek-test-dg
 ```
 
-Next, install vLLM:
-
-```shell
-uv pip install vllm>=0.7.0
-
-# For CUDA 12.1
-pip install vllm>=0.7.0 --extra-index-url https://download.pytorch.org/whl/cu121
-export LD_LIBRARY_PATH=$(python -c "import site; print(site.getsitepackages()[0] + '/nvidia/nvjitlink/lib')"):$LD_LIBRARY_PATH
+2. Build and start the development container:
+```bash
+docker compose up -d --build
+docker exec -it deepseek-test-container bash
 ```
 
-This will also install PyTorch `v2.5.1` and it is **very important** to use this version since the vLLM binaries are compiled for it. You can then install the remaining dependencies for your specific use case via `pip install -e .[LIST OF MODES]`. For most contributors, we recommend:
-
-```shell
-pip install -e ".[dev]"
-```
-
-Next, log into your Hugging Face and Weights and Biases accounts as follows:
-
-```shell
+3. Login to required services:
+```bash
 huggingface-cli login
 wandb login
 ```
 
-Finally, check whether your system has Git LFS installed so that you can load and push models/datasets to the Hugging Face Hub:
+The container comes with all required dependencies pre-installed:
+- vLLM with CUDA support
+- Project dependencies
+- Properly configured NVIDIA JIT linker path
 
-```shell
-git-lfs --version
-```
-
-If it isn't installed, run:
-
-```shell
-sudo apt-get install git-lfs
+Note: If you need to reinstall or update dependencies manually, you can still run:
+```bash
+uv pip install vllm>=0.7.0
+uv pip install -e ".[dev]"
 ```
 
 ## Training models

@@ -1,67 +1,66 @@
 {
-    "name": "DeepSeek Test DG",
-    "dockerComposeFile": "../docker-compose.yaml",
-    "service": "deepseek-test-dg",
-    "workspaceFolder": "/workspace",
-    "shutdownAction": "stopCompose",
-    "remoteUser": "devuser",
-    "containerUser": "devuser",
-    "updateRemoteUserUID": true,
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                // Python extensions
-                "ms-python.python",
-                "ms-python.debugpy",
-                "ms-toolsai.jupyter",
-                "ms-toolsai.jupyter-keymap",
-                "ms-toolsai.vscode-jupyter-slideshow",
-                "ms-toolsai.vscode-jupyter-cell-tags",
-                "ms-toolsai.vscode-jupyter-powertoys",
-                // Code quality & formatting
-                "ms-python.black-formatter",
-                "ms-python.isort",
-                "ms-python.flake8",
-                // JavaScript extensions
-                "esbenp.prettier-vscode",
-                "ms-vscode.live-server",
-                "dsznajder.es7-react-js-snippets",
-                "bradlc.vscode-tailwindcss",
-                "dbaeumer.vscode-eslint"
-            ],
-            "settings": {
-                "editor.formatOnSave": true,
-                "editor.formatOnSaveTimeout": 3000,
-                "editor.fontSize": 12,
-                "files.autoSave": "afterDelay",
-                "files.autoSaveDelay": 2000,
-                // Python settings
-                "[python]": {
-                    "editor.formatOnSave": true,
-                    "editor.defaultFormatter": "ms-python.black-formatter",
-                    "editor.codeActionsOnSave": {
-                        "source.fixAll": true,
-                        "source.organizeImports": true
-                    }
-                },
-                "python.defaultInterpreterPath": "/usr/local/bin/python3",
-                "python.formatting.provider": "black",
-                "python.analysis.typeCheckingMode": "basic",
-                "python.languageServer": "Pylance",
-                // JavaScript/React settings
-                "[javascript]": {
-                    "editor.defaultFormatter": "esbenp.prettier-vscode"
-                },
-                "[javascriptreact]": {
-                    "editor.defaultFormatter": "esbenp.prettier-vscode"
-                },
-                "javascript.updateImportsOnFileMove.enabled": "always",
-                // General settings
-                "editor.codeActionsOnSave": {
-                    "source.fixAll": true,
-                    "source.organizeImports": true
-                }
-            }
-        }
-    }
+  "name": "DeepSeek Test DG",
+  "dockerComposeFile": "../docker-compose.yaml",
+  "service": "deepseek-test-dg",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+      "vscode": {
+          "extensions": [
+              "ms-python.python",
+              "ms-python.mypy-type-checker",
+              "njpwerner.autodocstring",
+              "usernamehw.errorlens",
+              "charliermarsh.ruff"
+          ],
+          "settings": {
+              "editor.insertSpaces": true,
+              "editor.fontSize": 14,
+              "files.autoSave": "afterDelay",
+              "files.autoSaveDelay": 2000,
+              "[python]": {
+                  "editor.formatOnPaste": false,
+                  "editor.formatOnType": false,
+                  "editor.formatOnSave": true,
+                  "editor.formatOnSaveTimeout": 3000,
+                  "editor.codeActionsOnSave": {
+                      "source.fixAll.ruff": "explicit",
+                      "source.organizeImports.ruff": "always"
+                  },
+                  "editor.defaultFormatter": "charliermarsh.ruff"
+              },
+              "python.defaultInterpreterPath": "/usr/bin/python",
+              "ruff.interpreter": [
+                  "/usr/bin/python"
+              ],
+              "ruff.configuration": "${containerWorkspaceFolder}/pyproject.toml",
+              "ruff.path": [
+                  "/usr/local/bin/ruff"
+              ],
+              "ruff.lint.args": [
+                  "--config=${containerWorkspaceFolder}/pyproject.toml"
+              ],
+              "ruff.format.args": [
+                  "--config=${containerWorkspaceFolder}/pyproject.toml"
+              ],
+              "mypy-type-checker.interpreter": [
+                  "/usr/bin/python"
+              ],
+              "mypy-type-checker.args": [
+                  "--config-file=${containerWorkspaceFolder}/pyproject.toml"
+              ],
+              "mypy-type-checker.path": [
+                  "/usr/local/bin/mypy"
+              ],
+              "python.testing.pytestPath": "/usr/local/bin/pytest",
+              "python.testing.pytest": [
+                  "--config=${containerWorkspaceFolder}/pyproject.toml"
+              ],
+              "python.testing.unittestEnabled": false,
+              "python.testing.pytestEnabled": true,
+              "autoDocstring.docstringFormat": "numpy",
+              "errorLens.delay": 500
+          }
+      }
+  }
 }

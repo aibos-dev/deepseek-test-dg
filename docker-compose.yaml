@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3"
 services:
   deepseek-test-dg:
     container_name: deepseek-test-container
@@ -11,23 +11,19 @@ services:
         USERNAME: ${USERNAME:-devuser}
         USER_UID: ${UID:-1001}
         USER_GID: ${GID:-1001}
-        PYTHON_VERSION: 3.11.11
-        PYTHON_MAJOR: "3.11"
-    shm_size: "16gb"
+    shm_size: '16gb'  # Increased for ML workloads
     ulimits:
       memlock: -1
       stack: 67108864
     working_dir: /workspace
-    stdin_open: true
     tty: true
     volumes:
       - ../deepseek-test-dg:/workspace
-      - poetry-cache:/home/devuser/.cache/pypoetry
-      - /var/run/docker.sock:/var/run/docker.sock
+      - uv-cache:/home/devuser/.cache/uv
       - /mnt/st1/DeepSeekV3-2:/mymodels
     environment:
       ENV: "dev"
-      TZ: "Africa/Nairobi"
+      TZ: "Africa/Nairobi"  # Updated timezone
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
       DEVICE: "gpu"
@@ -36,9 +32,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0','1','2','3','4','5','6','7']
+              device_ids: ['0','1','2','3','4','5','6','7']  # Updated for 8 GPUs
               capabilities: [gpu]
     command: bash
 
 volumes:
-  poetry-cache:
+  uv-cache:
